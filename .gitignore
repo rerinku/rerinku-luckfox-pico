@@ -1,0 +1,6 @@
+# 官方 SDK 由 scripts/fetch-sdk.sh 拉取，不进版本控制
+/sdk/luckfox-pico/
+
+# 构建产物
+/build/
+/out/

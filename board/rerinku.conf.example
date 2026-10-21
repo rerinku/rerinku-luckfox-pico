@@ -1,0 +1,40 @@
+# rerinku-luckfox settings: /userdata/rerinku/rerinku.conf on the board.
+# key = value; '#' starts a comment. Any key can also be given on the command
+# line as key=value.
+
+# --- platform ---------------------------------------------------------------
+# rerinku platform (onboard) base URL. Required.
+endpoint = http://192.168.1.10:18070
+# Serial number: the device's identity on the platform. Empty: LUCKFOX-<CPU serial>.
+sn =
+# Display name. Empty: the platform shows the serial number.
+name =
+# Only when the platform enforces device keys: base64(HMAC-SHA256(key, sn)).
+secret =
+# https/mqtts: CA bundle (PEM). Empty: the system bundle.
+ca_file =
+tls_insecure = 0
+
+# --- camera -----------------------------------------------------------------
+iq_dir = /oem/usr/share/iqfiles
+# h264 plays in every browser; h265 only in some.
+codec = h264
+# SC3336 (Luckfox Pico Plus/Pro/Max camera): 2304x1296 full frame.
+width = 2304
+height = 1296
+fps = 25
+# Constant bit rate, kbit/s.
+bitrate = 2048
+# Frames between keyframes.
+gop = 50
+# VI hands the encoder a ring of lines instead of whole frames: saves about
+# 4 MB of the media memory at 2304x1296. Needed on RV1103 (64 MB).
+wrap = 1
+# Snapshot (thumbnail) JPEG quality 1-99; 0 disables snapshots.
+jpeg_quality = 70
+
+# --- SDK --------------------------------------------------------------------
+# Sent packets kept to answer retransmission requests (~1.2 KB each).
+nack_history = 256
+# error, warn, info, debug
+log_level = info

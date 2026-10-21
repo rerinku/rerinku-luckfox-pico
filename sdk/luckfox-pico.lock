@@ -1,0 +1,4 @@
+# Luckfox Pico 官方 SDK 的来源与钉住的版本，scripts/fetch-sdk.sh 读取。
+# 升级 SDK = 改这里的 SDK_COMMIT 后重跑 fetch-sdk.sh。
+SDK_URL=https://github.com/LuckfoxTECH/luckfox-pico.git
+SDK_COMMIT=824b817f889c2cbff1d48fcdb18ab494a68f69d1
