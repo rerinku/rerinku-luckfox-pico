@@ -58,7 +58,7 @@ void config_defaults(app_config *c) {
     c->wrap = 1;
     c->jpeg_quality = 70;
     c->nack_history = 256;
-    c->log_level = RERINKU_LOG_INFO;
+    c->log_level = RERINKU_LOG_LEVEL_INFO;
 }
 
 static char *trim(char *s) {

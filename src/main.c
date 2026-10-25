@@ -99,17 +99,17 @@ static void *snapshot_loop(void *arg) {
 
 /* ---- SDK callbacks ------------------------------------------------------------ */
 
-static const char *state_name(rerinku_state_t s) {
+static const char *state_name(rerinku_stream_state_t s) {
     static const char *names[] = {"new",    "connecting", "connected",
                                   "failed", "closed",     "disconnected"};
     return (unsigned)s < sizeof names / sizeof names[0] ? names[s] : "?";
 }
 
 static void on_status(void *user, rerinku_device_status_t status) {
-    LOGI("platform: %s", rerinku_device_status_string(status));
+    LOGI("platform: %s", rerinku_device_status_name(status));
 }
 
-static void on_stream_state(void *user, rerinku_state_t state) {
+static void on_stream_state(void *user, rerinku_stream_state_t state) {
     LOGI("stream: %s", state_name(state));
 }
 
@@ -195,7 +195,7 @@ static size_t on_runtime_info(void *user, char *buf, size_t cap) {
 static void on_frame(void *user, const uint8_t *data, size_t len, uint64_t pts_us,
                      bool keyframe) {
     rerinku_write_result_t r = rerinku_device_write(g_dev, VIDEO_CHANNEL, data, len, pts_us);
-    if (r == RERINKU_WRITE_INVALID_SAMPLE)
+    if (r == RERINKU_WRITE_RESULT_INVALID_FRAME)
         LOGW("encoder produced an invalid access unit (%zu bytes)", len);
 }
 
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
     }
 
     config_defaults(&g_cfg);
-    log_init(use_syslog, RERINKU_LOG_INFO);
+    log_init(use_syslog, RERINKU_LOG_LEVEL_INFO);
     int rc = config_load(&g_cfg, config_path);
     if (rc == -1 || (rc == -2 && explicit_config)) {
         if (rc == -2)
@@ -310,8 +310,8 @@ int main(int argc, char **argv) {
         cb.on_snapshot = on_snapshot;
 
     int err = rerinku_device_create(&dc, &cb, &g_dev);
-    if (err != RERINKU_DEVICE_OK) {
-        LOGE("rerinku_device_create: %s", rerinku_device_strerror(err));
+    if (err != RERINKU_OK) {
+        LOGE("rerinku_device_create: %s", rerinku_strerror(err));
         return 1;
     }
     bool h265 = strcmp(g_cfg.codec, "h265") == 0;
@@ -319,9 +319,9 @@ int main(int argc, char **argv) {
     memset(&ch, 0, sizeof ch);
     ch.struct_size = sizeof ch;
     ch.channel_id = VIDEO_CHANNEL;
-    ch.kind = RERINKU_MEDIA_VIDEO;
+    ch.kind = RERINKU_MEDIA_KIND_VIDEO;
     ch.codec = h265 ? RERINKU_CODEC_H265 : RERINKU_CODEC_H264;
-    ch.bitstream_format = RERINKU_BITSTREAM_ANNEX_B; /* what VENC emits */
+    ch.bitstream_format = RERINKU_BITSTREAM_FORMAT_ANNEX_B; /* what VENC emits */
     ch.label = "main";
     ch.stream_id = "main";
     ch.width = (uint32_t)g_cfg.width;
@@ -354,8 +354,8 @@ int main(int argc, char **argv) {
         else
             LOGW("snapshot thread could not start");
     }
-    if ((err = rerinku_device_start(g_dev)) != RERINKU_DEVICE_OK) {
-        LOGE("rerinku_device_start: %s", rerinku_device_strerror(err));
+    if ((err = rerinku_device_start(g_dev)) != RERINKU_OK) {
+        LOGE("rerinku_device_start: %s", rerinku_strerror(err));
         rc = 1;
         goto out;
     }

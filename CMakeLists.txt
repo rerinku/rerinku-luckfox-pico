@@ -15,7 +15,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
 set(RERINKU_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/rerinku-sdk" CACHE PATH
-    "rerinku SDK install prefix (include/rerinku, lib/librerinku.a)")
+    "Rerinku Device SDK install prefix (scripts/build-sdk.sh)")
 set(LUCKFOX_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdk/luckfox-pico" CACHE PATH
     "Luckfox Pico SDK checkout")
 set(RERINKU_BOARD_LIBDIR "/oem/usr/lib" CACHE STRING
@@ -29,8 +29,14 @@ set(_aiq "${_media}/isp/release_camera_engine_rkaiq_${_triple}")
 set(_mpp_lib "${_media}/mpp/release_mpp_${_triple}/lib")
 set(_rga_lib "${_media}/rga/release_rga_${_triple}/lib")
 
-foreach(_p "${RERINKU_SDK_DIR}/lib/librerinku.a" "${_rockit_lib}/librockit.so"
-           "${_aiq}/lib/librkaiq.so")
+# The SDK's CMake package. It lives outside the cross sysroot, so look in
+# RERINKU_SDK_DIR only (the toolchain file restricts packages to the sysroot).
+find_package(rerinku_device 0.5 CONFIG PATHS "${RERINKU_SDK_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+if(NOT rerinku_device_FOUND)
+    message(FATAL_ERROR "Rerinku Device SDK 0.5 not found in ${RERINKU_SDK_DIR} (run scripts/build-sdk.sh)")
+endif()
+
+foreach(_p "${_rockit_lib}/librockit.so" "${_aiq}/lib/librkaiq.so")
     if(NOT EXISTS "${_p}")
         message(FATAL_ERROR "missing ${_p} (run scripts/fetch-sdk.sh and scripts/build-sdk.sh)")
     endif()
@@ -49,7 +55,6 @@ target_compile_definitions(rerinku-luckfox PRIVATE
     RKAIQ UAPI2 RV1106_RV1103)
 target_compile_options(rerinku-luckfox PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
-target_include_directories(rerinku-luckfox PRIVATE "${RERINKU_SDK_DIR}/include")
 # Vendor headers are not warning-clean.
 target_include_directories(rerinku-luckfox SYSTEM PRIVATE
     "${_rockit_inc}"
@@ -62,7 +67,7 @@ target_include_directories(rerinku-luckfox SYSTEM PRIVATE
     "${_aiq}/include/rkaiq/iq_parser_v2")
 
 target_link_libraries(rerinku-luckfox PRIVATE
-    "${RERINKU_SDK_DIR}/lib/librerinku.a"
+    rerinku::device
     "${_rockit_lib}/librockit.so"
     "${_aiq}/lib/librkaiq.so"
     pthread)

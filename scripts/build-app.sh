@@ -15,7 +15,7 @@ BUILD="$ROOT/build/app"
 PREFIX="$ROOT/out"
 BUILD_TYPE="${BUILD_TYPE:-MinSizeRel}"
 
-if [ ! -f "$ROOT/build/rerinku-sdk/lib/librerinku.a" ]; then
+if [ ! -f "$ROOT/build/rerinku-sdk/lib/librerinku_device.a" ]; then
     "$ROOT/scripts/build-sdk.sh"
 fi
 

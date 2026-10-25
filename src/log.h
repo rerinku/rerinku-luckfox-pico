@@ -12,9 +12,9 @@ int log_level_parse(const char *name);
 void log_write(rerinku_log_level_t level, const char *tag, const char *fmt, ...)
     __attribute__((format(printf, 3, 4)));
 
-#define LOGE(...) log_write(RERINKU_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define LOGW(...) log_write(RERINKU_LOG_WARN, LOG_TAG, __VA_ARGS__)
-#define LOGI(...) log_write(RERINKU_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) log_write(RERINKU_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) log_write(RERINKU_LOG_LEVEL_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) log_write(RERINKU_LOG_LEVEL_WARN, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) log_write(RERINKU_LOG_LEVEL_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) log_write(RERINKU_LOG_LEVEL_DEBUG, LOG_TAG, __VA_ARGS__)
 
 #endif

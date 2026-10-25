@@ -8,7 +8,7 @@
 #include <time.h>
 
 static int g_syslog;
-static rerinku_log_level_t g_level = RERINKU_LOG_INFO;
+static rerinku_log_level_t g_level = RERINKU_LOG_LEVEL_INFO;
 
 static void emit(rerinku_log_level_t level, const char *tag, const char *msg) {
     if (level > g_level)
@@ -43,7 +43,7 @@ void log_init(int use_syslog, rerinku_log_level_t level) {
     else
         setvbuf(stderr, NULL, _IOLBF, 0);
     rerinku_set_log_level(level);
-    rerinku_set_log_handler(sdk_log, NULL);
+    rerinku_set_log_callback(sdk_log, NULL);
 }
 
 int log_level_parse(const char *name) {

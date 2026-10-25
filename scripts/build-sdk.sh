@@ -2,9 +2,10 @@
 # Cross-compile the rerinku device SDK (../rerinku-client) for RV1103/RV1106
 # inside the official build container, and install it to build/rerinku-sdk:
 #
-#   build/rerinku-sdk/include/rerinku/   rerinku_device.h (the C API)
-#   build/rerinku-sdk/lib/               librerinku.a (SDK + dependencies in one
-#                                        archive), librerinku.so
+#   build/rerinku-sdk/include/rerinku/   rerinku_device.h (the C API), rerinku_version.h
+#   build/rerinku-sdk/lib/               librerinku_device.a (SDK + dependencies in
+#                                        one archive), librerinku_device.so
+#   build/rerinku-sdk/lib/cmake/         find_package(rerinku_device)
 #   build/rerinku-client/                build tree (examples, tests)
 #
 #   scripts/build-sdk.sh            Release build (size-optimized)
