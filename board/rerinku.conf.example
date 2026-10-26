@@ -17,8 +17,11 @@ tls_insecure = 0
 
 # --- camera -----------------------------------------------------------------
 iq_dir = /oem/usr/share/iqfiles
-# h264 plays in every browser; h265 only in some.
-codec = h264
+# Main stream codec. h265 needs about half the bits of h264 for the same
+# picture, but only some browsers decode it (Safari; Chrome with hardware
+# decoding): the platform plays the H.264 sub stream to the others. With
+# sub = 0, use h264 so every browser plays the main stream.
+codec = h265
 # SC3336 (Luckfox Pico Plus/Pro/Max camera): 2304x1296 full frame.
 width = 2304
 height = 1296
@@ -32,6 +35,18 @@ gop = 50
 wrap = 1
 # Snapshot (thumbnail) JPEG quality 1-99; 0 disables snapshots.
 jpeg_quality = 70
+
+# --- sub stream ---------------------------------------------------------------
+# A second, smaller stream from the ISP's second output and its own encoder:
+# for multi-camera walls, phones and browsers without H.265. Both streams
+# share one connection; the platform asks for the sub stream only while
+# someone watches it. Costs about 1.4 MB of media memory and 2-3% CPU.
+sub = 1
+sub_codec = h264
+# Even, no larger than the main stream; keep the main stream's aspect ratio.
+sub_width = 640
+sub_height = 360
+sub_bitrate = 512
 
 # --- SDK --------------------------------------------------------------------
 # Sent packets kept to answer retransmission requests (~1.2 KB each).

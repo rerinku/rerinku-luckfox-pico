@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,11 @@
 #define CAM_ID 0    /* rkaiq camera (ISP) index */
 #define VI_DEV 0
 #define VI_PIPE 0
-#define VI_CHN 0    /* rkisp main path: full resolution */
+#define VI_CHN 0     /* rkisp main path: full resolution */
+#define VI_CHN_SUB 1 /* rkisp self path: downscaled */
 #define VENC_MAIN 0
 #define VENC_JPEG 1
+#define VENC_SUB 2
 
 static struct {
     cam_config cfg;
@@ -35,8 +38,10 @@ static struct {
     rk_aiq_sys_ctx_t *aiq;
     char sensor[64];
     bool sys_init, vi_dev, vi_chn, venc_main, venc_jpeg, bound;
+    bool vi_sub, venc_sub, bound_sub;
 
-    pthread_t thread;
+    pthread_t thread, sub_thread;
+    bool sub_thread_started;
     volatile bool running;
 
     pthread_mutex_t stats_mu;
@@ -171,33 +176,61 @@ static int vi_start(void) {
     return 0;
 }
 
+/* The ISP's self path scales the picture down for the sub stream. Two frame
+ * buffers of sub size, no wrap (that is for the full-size main path). */
+static int vi_sub_start(void) {
+    VI_CHN_ATTR_S chn;
+    memset(&chn, 0, sizeof chn);
+    chn.stIspOpt.u32BufCount = 2;
+    chn.stIspOpt.enMemoryType = VI_V4L2_MEMORY_TYPE_DMABUF;
+    chn.stIspOpt.stMaxSize.u32Width = cam.cfg.sub_width;
+    chn.stIspOpt.stMaxSize.u32Height = cam.cfg.sub_height;
+    chn.stSize.u32Width = cam.cfg.sub_width;
+    chn.stSize.u32Height = cam.cfg.sub_height;
+    chn.enPixelFormat = RK_FMT_YUV420SP;
+    chn.enCompressMode = COMPRESS_MODE_NONE;
+    chn.u32Depth = 0;
+    RK_S32 ret = RK_MPI_VI_SetChnAttr(VI_PIPE, VI_CHN_SUB, &chn);
+    if (ret != RK_SUCCESS) {
+        LOGE("VI SetChnAttr (sub) %dx%d: %#x", cam.cfg.sub_width, cam.cfg.sub_height, ret);
+        return -1;
+    }
+    if ((ret = RK_MPI_VI_EnableChn(VI_PIPE, VI_CHN_SUB)) != RK_SUCCESS) {
+        LOGE("VI EnableChn (sub): %#x", ret);
+        return -1;
+    }
+    cam.vi_sub = true;
+    return 0;
+}
+
 /* ---- VENC ----------------------------------------------------------------- */
 
-static int venc_main_start(void) {
+/* An H.264/H.265 CBR encoder channel; the main stream also gets wrap mode. */
+static int venc_video_start(int chn, bool h265, int width, int height, int kbps, bool wrap) {
     const cam_config *c = &cam.cfg;
     VENC_CHN_ATTR_S attr;
     memset(&attr, 0, sizeof attr);
-    attr.stVencAttr.enType = c->h265 ? RK_VIDEO_ID_HEVC : RK_VIDEO_ID_AVC;
+    attr.stVencAttr.enType = h265 ? RK_VIDEO_ID_HEVC : RK_VIDEO_ID_AVC;
     attr.stVencAttr.enPixelFormat = RK_FMT_YUV420SP;
-    attr.stVencAttr.u32Profile = c->h265 ? 0 /* Main */ : 100 /* High */;
-    attr.stVencAttr.u32MaxPicWidth = c->width;
-    attr.stVencAttr.u32MaxPicHeight = c->height;
-    attr.stVencAttr.u32PicWidth = c->width;
-    attr.stVencAttr.u32PicHeight = c->height;
-    attr.stVencAttr.u32VirWidth = c->width;
-    attr.stVencAttr.u32VirHeight = c->height;
+    attr.stVencAttr.u32Profile = h265 ? 0 /* Main */ : 100 /* High */;
+    attr.stVencAttr.u32MaxPicWidth = width;
+    attr.stVencAttr.u32MaxPicHeight = height;
+    attr.stVencAttr.u32PicWidth = width;
+    attr.stVencAttr.u32PicHeight = height;
+    attr.stVencAttr.u32VirWidth = width;
+    attr.stVencAttr.u32VirHeight = height;
     attr.stVencAttr.u32StreamBufCnt = 4;
-    attr.stVencAttr.u32BufSize = c->width * c->height / 2; /* largest IDR it can hold */
+    attr.stVencAttr.u32BufSize = width * height / 2; /* largest IDR it can hold */
 
     VENC_H264_CBR_S cbr; /* H.265 CBR is the same struct */
     memset(&cbr, 0, sizeof cbr);
     cbr.u32Gop = c->gop;
-    cbr.u32BitRate = c->bitrate_kbps;
+    cbr.u32BitRate = kbps;
     cbr.u32SrcFrameRateNum = c->fps;
     cbr.u32SrcFrameRateDen = 1;
     cbr.fr32DstFrameRateNum = c->fps;
     cbr.fr32DstFrameRateDen = 1;
-    if (c->h265) {
+    if (h265) {
         attr.stRcAttr.enRcMode = VENC_RC_MODE_H265CBR;
         attr.stRcAttr.stH265Cbr = cbr;
     } else {
@@ -206,19 +239,22 @@ static int venc_main_start(void) {
     }
     attr.stGopAttr.enGopMode = VENC_GOPMODE_NORMALP;
 
-    RK_S32 ret = RK_MPI_VENC_CreateChn(VENC_MAIN, &attr);
+    RK_S32 ret = RK_MPI_VENC_CreateChn(chn, &attr);
     if (ret != RK_SUCCESS) {
-        LOGE("VENC CreateChn: %#x", ret);
+        LOGE("VENC %d CreateChn: %#x", chn, ret);
         return -1;
     }
-    cam.venc_main = true;
+    if (chn == VENC_MAIN)
+        cam.venc_main = true;
+    else
+        cam.venc_sub = true;
 
-    if (c->wrap) {
-        VENC_CHN_BUF_WRAP_S wrap;
-        memset(&wrap, 0, sizeof wrap);
-        wrap.bEnable = RK_TRUE;
-        wrap.u32BufLine = wrap_lines();
-        if ((ret = RK_MPI_VENC_SetChnBufWrapAttr(VENC_MAIN, &wrap)) != RK_SUCCESS) {
+    if (wrap) {
+        VENC_CHN_BUF_WRAP_S w;
+        memset(&w, 0, sizeof w);
+        w.bEnable = RK_TRUE;
+        w.u32BufLine = wrap_lines();
+        if ((ret = RK_MPI_VENC_SetChnBufWrapAttr(chn, &w)) != RK_SUCCESS) {
             LOGE("VENC SetChnBufWrapAttr: %#x", ret);
             return -1;
         }
@@ -228,13 +264,13 @@ static int venc_main_start(void) {
     VENC_CHN_REF_BUF_SHARE_S share;
     memset(&share, 0, sizeof share);
     share.bEnable = RK_TRUE;
-    RK_MPI_VENC_SetChnRefBufShareAttr(VENC_MAIN, &share);
+    RK_MPI_VENC_SetChnRefBufShareAttr(chn, &share);
 
     VENC_RECV_PIC_PARAM_S recv;
     memset(&recv, 0, sizeof recv);
     recv.s32RecvPicNum = -1; /* forever */
-    if ((ret = RK_MPI_VENC_StartRecvFrame(VENC_MAIN, &recv)) != RK_SUCCESS) {
-        LOGE("VENC StartRecvFrame: %#x", ret);
+    if ((ret = RK_MPI_VENC_StartRecvFrame(chn, &recv)) != RK_SUCCESS) {
+        LOGE("VENC %d StartRecvFrame: %#x", chn, ret);
         return -1;
     }
     return 0;
@@ -297,8 +333,8 @@ static int venc_jpeg_start(void) {
 
 /* ---- encoder thread ------------------------------------------------------- */
 
-static bool is_keyframe(const VENC_PACK_S *p) {
-    if (cam.cfg.h265)
+static bool is_keyframe(const VENC_PACK_S *p, bool h265) {
+    if (h265)
         return p->DataType.enH265EType == H265E_NALU_IDRSLICE ||
                p->DataType.enH265EType == H265E_NALU_ISLICE;
     return p->DataType.enH264EType == H264E_NALU_IDRSLICE ||
@@ -306,7 +342,11 @@ static bool is_keyframe(const VENC_PACK_S *p) {
 }
 
 static void *encoder_loop(void *arg) {
-    prctl(PR_SET_NAME, "venc0", 0, 0, 0);
+    const int stream_idx = (int)(intptr_t)arg;
+    const bool sub = stream_idx == CAM_STREAM_SUB;
+    const int chn = sub ? VENC_SUB : VENC_MAIN;
+    const bool h265 = sub ? cam.cfg.sub_h265 : cam.cfg.h265;
+    prctl(PR_SET_NAME, sub ? "venc-sub" : "venc-main", 0, 0, 0);
     VENC_PACK_S pack;
     VENC_STREAM_S stream;
     unsigned consecutive_errors = 0;
@@ -316,7 +356,7 @@ static void *encoder_loop(void *arg) {
         stream.pstPack = &pack;
         stream.u32PackCount = 1;
         /* Bounded wait so cam_close() is noticed. */
-        RK_S32 ret = RK_MPI_VENC_GetStream(VENC_MAIN, &stream, 500);
+        RK_S32 ret = RK_MPI_VENC_GetStream(chn, &stream, 500);
         if (ret != RK_SUCCESS) {
             pthread_mutex_lock(&cam.stats_mu);
             cam.stats.get_errors++;
@@ -324,7 +364,7 @@ static void *encoder_loop(void *arg) {
             /* One timeout is normal at start; a run of them means the sensor
              * stopped. */
             if (++consecutive_errors == 10)
-                LOGW("no encoded frames for 5 s (%#x)", ret);
+                LOGW("%s: no encoded frames for 5 s (%#x)", sub ? "sub" : "main", ret);
             continue;
         }
         if (consecutive_errors >= 10)
@@ -332,15 +372,20 @@ static void *encoder_loop(void *arg) {
         consecutive_errors = 0;
 
         const uint8_t *data = RK_MPI_MB_Handle2VirAddr(pack.pMbBlk);
-        bool key = is_keyframe(&pack);
+        bool key = is_keyframe(&pack, h265);
         if (data && pack.u32Len > 0)
-            cam.on_frame(cam.user, data, pack.u32Len, pack.u64PTS, key);
-        RK_MPI_VENC_ReleaseStream(VENC_MAIN, &stream);
+            cam.on_frame(cam.user, stream_idx, data, pack.u32Len, pack.u64PTS, key);
+        RK_MPI_VENC_ReleaseStream(chn, &stream);
 
         pthread_mutex_lock(&cam.stats_mu);
-        cam.stats.frames++;
-        cam.stats.bytes += pack.u32Len;
-        cam.stats.keyframes += key;
+        if (sub) {
+            cam.stats.sub_frames++;
+            cam.stats.sub_bytes += pack.u32Len;
+        } else {
+            cam.stats.frames++;
+            cam.stats.bytes += pack.u32Len;
+            cam.stats.keyframes += key;
+        }
         pthread_mutex_unlock(&cam.stats_mu);
     }
     return NULL;
@@ -363,7 +408,9 @@ int cam_open(const cam_config *cfg, cam_frame_fn on_frame, void *user) {
         goto fail;
     }
     cam.sys_init = true;
-    if (vi_start() != 0 || venc_main_start() != 0)
+    if (vi_start() != 0 ||
+        venc_video_start(VENC_MAIN, cfg->h265, cfg->width, cfg->height, cfg->bitrate_kbps,
+                         cfg->wrap) != 0)
         goto fail;
     if (cfg->jpeg_quality > 0 && venc_jpeg_start() != 0) {
         LOGW("snapshots disabled: the JPEG encoder could not be set up");
@@ -381,15 +428,41 @@ int cam_open(const cam_config *cfg, cam_frame_fn on_frame, void *user) {
     }
     cam.bound = true;
 
+    if (cfg->sub) {
+        if (vi_sub_start() != 0 ||
+            venc_video_start(VENC_SUB, cfg->sub_h265, cfg->sub_width, cfg->sub_height,
+                             cfg->sub_bitrate_kbps, false) != 0)
+            goto fail;
+        MPP_CHN_S ssrc = {.enModId = RK_ID_VI, .s32DevId = VI_DEV, .s32ChnId = VI_CHN_SUB};
+        MPP_CHN_S sdst = {.enModId = RK_ID_VENC, .s32DevId = 0, .s32ChnId = VENC_SUB};
+        if ((ret = RK_MPI_SYS_Bind(&ssrc, &sdst)) != RK_SUCCESS) {
+            LOGE("bind VI -> VENC (sub): %#x", ret);
+            goto fail;
+        }
+        cam.bound_sub = true;
+    }
+
     cam.running = true;
-    if ((errno = pthread_create(&cam.thread, NULL, encoder_loop, NULL)) != 0) {
+    if ((errno = pthread_create(&cam.thread, NULL, encoder_loop,
+                                (void *)(intptr_t)CAM_STREAM_MAIN)) != 0) {
         LOGE("encoder thread: %s", strerror(errno));
         cam.running = false;
         goto fail;
     }
+    if (cfg->sub) {
+        if ((errno = pthread_create(&cam.sub_thread, NULL, encoder_loop,
+                                    (void *)(intptr_t)CAM_STREAM_SUB)) != 0) {
+            LOGE("sub encoder thread: %s", strerror(errno));
+            goto fail;
+        }
+        cam.sub_thread_started = true;
+    }
     LOGI("%dx%d@%d %s CBR %d kbit/s, GOP %d%s%s", cfg->width, cfg->height, cfg->fps,
          cfg->h265 ? "H.265" : "H.264", cfg->bitrate_kbps, cfg->gop,
          cfg->wrap ? ", wrap" : "", cam.venc_jpeg ? ", JPEG snapshots" : "");
+    if (cfg->sub)
+        LOGI("sub stream %dx%d@%d %s CBR %d kbit/s", cfg->sub_width, cfg->sub_height, cfg->fps,
+             cfg->sub_h265 ? "H.265" : "H.264", cfg->sub_bitrate_kbps);
     return 0;
 
 fail:
@@ -401,6 +474,24 @@ void cam_close(void) {
     if (cam.running) {
         cam.running = false;
         pthread_join(cam.thread, NULL);
+        if (cam.sub_thread_started)
+            pthread_join(cam.sub_thread, NULL);
+        cam.sub_thread_started = false;
+    }
+    if (cam.bound_sub) {
+        MPP_CHN_S src = {.enModId = RK_ID_VI, .s32DevId = VI_DEV, .s32ChnId = VI_CHN_SUB};
+        MPP_CHN_S dst = {.enModId = RK_ID_VENC, .s32DevId = 0, .s32ChnId = VENC_SUB};
+        RK_MPI_SYS_UnBind(&src, &dst);
+        cam.bound_sub = false;
+    }
+    if (cam.vi_sub) {
+        RK_MPI_VI_DisableChn(VI_PIPE, VI_CHN_SUB);
+        cam.vi_sub = false;
+    }
+    if (cam.venc_sub) {
+        RK_MPI_VENC_StopRecvFrame(VENC_SUB);
+        RK_MPI_VENC_DestroyChn(VENC_SUB);
+        cam.venc_sub = false;
     }
     if (cam.bound) {
         MPP_CHN_S src = {.enModId = RK_ID_VI, .s32DevId = VI_DEV, .s32ChnId = VI_CHN};
@@ -433,9 +524,13 @@ void cam_close(void) {
     isp_stop();
 }
 
-void cam_request_idr(void) {
-    if (cam.venc_main)
+void cam_request_idr(int stream) {
+    if (stream == CAM_STREAM_SUB) {
+        if (cam.venc_sub)
+            RK_MPI_VENC_RequestIDR(VENC_SUB, RK_TRUE);
+    } else if (cam.venc_main) {
         RK_MPI_VENC_RequestIDR(VENC_MAIN, RK_TRUE);
+    }
 }
 
 int cam_snapshot(void (*fn)(void *user, const uint8_t *jpeg, size_t len), void *user,

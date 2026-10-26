@@ -20,6 +20,11 @@ typedef struct app_config {
     int gop;          /* frames between keyframes */
     int wrap;         /* VI->VENC line-buffer (wrap) mode: saves ~4 MB of CMA */
     int jpeg_quality; /* snapshot JPEG quality 1-99, 0 = no snapshots */
+    /* sub stream (ISP second output, own encoder); same fps and GOP */
+    int sub;          /* 0 = off */
+    char sub_codec[8]; /* h264 | h265 */
+    int sub_width, sub_height;
+    int sub_bitrate_kbps;
 
     /* SDK */
     int nack_history; /* packets kept for retransmission */

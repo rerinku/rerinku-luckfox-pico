@@ -29,7 +29,8 @@
 #define LOG_TAG "app"
 
 #define DEFAULT_CONFIG "/userdata/rerinku/rerinku.conf"
-#define VIDEO_CHANNEL 0u
+#define VIDEO_CHANNEL 0u /* main stream */
+#define SUB_CHANNEL 1u   /* sub stream (optional) */
 #define SNAPSHOT_TIMEOUT_MS 2000
 #define MAX_PENDING_SNAPSHOTS 8
 
@@ -115,7 +116,8 @@ static void on_stream_state(void *user, rerinku_stream_state_t state) {
 
 static int on_stream_start(void *user) {
     LOGI("stream requested");
-    cam_request_idr();
+    cam_request_idr(CAM_STREAM_MAIN);
+    cam_request_idr(CAM_STREAM_SUB);
     return 0;
 }
 
@@ -124,7 +126,7 @@ static void on_stream_stop(void *user, const char *reason) {
 }
 
 static void on_keyframe_request(void *user, uint32_t channel_id) {
-    cam_request_idr();
+    cam_request_idr(channel_id == SUB_CHANNEL ? CAM_STREAM_SUB : CAM_STREAM_MAIN);
 }
 
 static void on_snapshot(void *user, const char *request_id) {
@@ -181,6 +183,11 @@ static size_t on_runtime_info(void *user, char *buf, size_t cap) {
         n += snprintf(buf + n, cap - n, ",\"videoFps\":%.1f,\"videoKbps\":%.0f",
                       (double)(cs.frames - prev.frames) / dt,
                       (double)(cs.bytes - prev.bytes) * 8 / 1000 / dt);
+    if (n > 0 && (size_t)n < cap && prev_at > 0 && dt > 0.5 && g_cfg.sub &&
+        cs.sub_frames >= prev.sub_frames)
+        n += snprintf(buf + n, cap - n, ",\"subFps\":%.1f,\"subKbps\":%.0f",
+                      (double)(cs.sub_frames - prev.sub_frames) / dt,
+                      (double)(cs.sub_bytes - prev.sub_bytes) * 8 / 1000 / dt);
     prev = cs;
     prev_at = now;
     if (n > 0 && (size_t)n + 2 <= cap) {
@@ -192,9 +199,10 @@ static size_t on_runtime_info(void *user, char *buf, size_t cap) {
 }
 
 /* Encoder thread. */
-static void on_frame(void *user, const uint8_t *data, size_t len, uint64_t pts_us,
+static void on_frame(void *user, int stream, const uint8_t *data, size_t len, uint64_t pts_us,
                      bool keyframe) {
-    rerinku_write_result_t r = rerinku_device_write(g_dev, VIDEO_CHANNEL, data, len, pts_us);
+    uint32_t channel = stream == CAM_STREAM_SUB ? SUB_CHANNEL : VIDEO_CHANNEL;
+    rerinku_write_result_t r = rerinku_device_write(g_dev, channel, data, len, pts_us);
     if (r == RERINKU_WRITE_RESULT_INVALID_FRAME)
         LOGW("encoder produced an invalid access unit (%zu bytes)", len);
 }
@@ -329,6 +337,19 @@ int main(int argc, char **argv) {
     ch.fps = (uint32_t)g_cfg.fps;
     ch.bitrate_bps = (uint32_t)g_cfg.bitrate_kbps * 1000u;
     rerinku_device_add_channel(g_dev, &ch);
+    bool sub_h265 = strcmp(g_cfg.sub_codec, "h265") == 0;
+    if (g_cfg.sub) {
+        /* A separate viewable stream ("sub"): the platform picks main or sub
+         * per viewer. */
+        ch.channel_id = SUB_CHANNEL;
+        ch.codec = sub_h265 ? RERINKU_CODEC_H265 : RERINKU_CODEC_H264;
+        ch.label = "sub";
+        ch.stream_id = "sub";
+        ch.width = (uint32_t)g_cfg.sub_width;
+        ch.height = (uint32_t)g_cfg.sub_height;
+        ch.bitrate_bps = (uint32_t)g_cfg.sub_bitrate_kbps * 1000u;
+        rerinku_device_add_channel(g_dev, &ch);
+    }
 
     /* Camera before the platform connection: a device that announces itself
      * should be able to stream. */
@@ -342,6 +363,11 @@ int main(int argc, char **argv) {
         .gop = g_cfg.gop,
         .wrap = g_cfg.wrap != 0,
         .jpeg_quality = g_cfg.jpeg_quality,
+        .sub = g_cfg.sub != 0,
+        .sub_h265 = sub_h265,
+        .sub_width = g_cfg.sub_width,
+        .sub_height = g_cfg.sub_height,
+        .sub_bitrate_kbps = g_cfg.sub_bitrate_kbps,
     };
     if (cam_open(&cc, on_frame, NULL) != 0) {
         LOGE("camera start failed");

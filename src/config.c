@@ -41,6 +41,11 @@ static const field fields[] = {
     I("gop", gop, 1, 600),
     I("wrap", wrap, 0, 1),
     I("jpeg_quality", jpeg_quality, 0, 99),
+    I("sub", sub, 0, 1),
+    S("sub_codec", sub_codec),
+    I("sub_width", sub_width, 64, 1920),
+    I("sub_height", sub_height, 64, 1080),
+    I("sub_bitrate", sub_bitrate_kbps, 32, 8000),
     I("nack_history", nack_history, 0, 4096),
     {"log_level", LEVEL, offsetof(app_config, log_level), 0, 0, 0},
 };
@@ -48,8 +53,10 @@ static const field fields[] = {
 void config_defaults(app_config *c) {
     memset(c, 0, sizeof *c);
     snprintf(c->iq_dir, sizeof c->iq_dir, "/oem/usr/share/iqfiles");
-    snprintf(c->codec, sizeof c->codec, "h264");
-    /* SC3336 full frame; browsers decode it fine. */
+    /* H.265 main stream with an H.264 sub stream: the platform plays the sub
+     * stream to browsers that cannot decode H.265. */
+    snprintf(c->codec, sizeof c->codec, "h265");
+    /* SC3336 full frame. */
     c->width = 2304;
     c->height = 1296;
     c->fps = 25;
@@ -57,6 +64,12 @@ void config_defaults(app_config *c) {
     c->gop = 50;
     c->wrap = 1;
     c->jpeg_quality = 70;
+    c->sub = 1;
+    snprintf(c->sub_codec, sizeof c->sub_codec, "h264");
+    /* 16:9 like the main stream; small enough for a multi-camera wall. */
+    c->sub_width = 640;
+    c->sub_height = 360;
+    c->sub_bitrate_kbps = 512;
     c->nack_history = 256;
     c->log_level = RERINKU_LOG_LEVEL_INFO;
 }
@@ -157,6 +170,15 @@ int config_finish(app_config *c) {
     /* The encoder works on 16x16 blocks of 4:2:0 frames; odd sizes fail. */
     if (c->width % 2 || c->height % 2) {
         LOGE("width and height must be even");
+        return -1;
+    }
+    if (strcmp(c->sub_codec, "h264") != 0 && strcmp(c->sub_codec, "h265") != 0) {
+        LOGE("sub_codec must be h264 or h265");
+        return -1;
+    }
+    if (c->sub && (c->sub_width % 2 || c->sub_height % 2 || c->sub_width > c->width ||
+                   c->sub_height > c->height)) {
+        LOGE("sub_width/sub_height must be even and no larger than the main stream");
         return -1;
     }
     if (!c->sn[0]) {

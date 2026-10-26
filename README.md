@@ -76,16 +76,21 @@ rkipc 占着摄像头，而且停掉后无法干净地重新拉起，所以切�
 |---|---|---|
 | `endpoint` | （必填） | rerinku 平台（onboard）地址 |
 | `sn` / `name` | CPU 序列号 / 空 | 设备身份与显示名 |
-| `codec` | `h264` | `h265` 只有部分浏览器能播 |
+| `codec` | `h265` | 主码流编码；不支持 H.265 的浏览器由平台改放子码流。关掉子码流时建议改 `h264` |
 | `width` × `height` @ `fps` | 2304×1296@25 | SC3336 全幅 |
 | `bitrate` / `gop` | 2048 kbit/s CBR / 50 帧 | |
 | `wrap` | 1 | VI→VENC 行缓冲（wrap）模式，2304×1296 下省约 4 MB 媒体内存，RV1103 必须开 |
 | `jpeg_quality` | 70 | 快照 JPEG 质量，0 关闭快照 |
+| `sub` | 1 | 子码流（流畅）：多分屏、手机、不支持 H.265 的浏览器看它 |
+| `sub_codec` | `h264` | |
+| `sub_width` × `sub_height` | 640×360 | 偶数，不大于主码流 |
+| `sub_bitrate` | 512 kbit/s CBR | |
 
 ## 程序结构
 
 ```
-src/camera.c    rkaiq ISP（3A、IQ 文件）→ VI 通道 0 → VENC 0（H.264/H.265 CBR）+ VENC 1（JPEG，与 VENC 0 combo）
+src/camera.c    rkaiq ISP（3A、IQ 文件）→ VI 通道 0 → VENC 0（主码流 H.264/H.265 CBR）+ VENC 1（JPEG，与 VENC 0 combo）
+                                    → VI 通道 1 → VENC 2（子码流，ISP 第二路输出直接缩放，不经软件）
 src/main.c      SDK 接入：设备配置与回调、快照线程、信号与关机顺序
 src/config.c    配置文件与命令行覆盖
 src/sysinfo.c   CPU 序列号、型号；静态描述（SoC/CPU/内存/系统/MAC，ext_json）与运行状态（温度/CPU/内存，get_runtime）
@@ -96,6 +101,8 @@ board/          板上的启动脚本与配置模板
 和 SDK 的对接点：
 
 - 编码器一直在跑，每帧交给 `rerinku_device_write()`；没人观看时 SDK 直接丢弃，代价很小。
+- 两路码流是同一个推流会话里的两个通道（stream id `main` / `sub`）。平台在 `push_sfu` 里
+  说要哪几路，SDK 只发要的那几路；中途加一路从它的下一个关键帧开始发，不重建连接。
 - 不开 SDK 的 GOP 缓存（`gop_cache_max_bytes = 0`，3 MP 的一个 GOP 太占内存）；新观众进来时
   SDK 回调 `on_keyframe_request`，程序调 `RK_MPI_VENC_RequestIDR` 立即出 IDR。
 - 快照：`on_snapshot` 只排队，快照线程让 JPEG 通道编下一帧，一张图同时回复期间到达的所有请求。
@@ -114,6 +121,9 @@ board/          板上的启动脚本与配置模板
 | 打开实时画面到首帧 | 1–2 秒 | — |
 
 空闲时的 CPU 大部分是 rkaiq 的 3A 线程（约 8%，rkipc 也一样），取流线程约 2%。
+
+加开子码流（640×360 H.264 512 kbit/s，两路都 25 帧）后：媒体内存池占用 +1.4 MB，系统可用内存
+基本不变，程序 CPU 空闲 +1%、两路同时推流 +3%。两路共用一个硬件编码核，主码流帧率不受影响。
 rkipc 同时跑主码流、子码流、智能分析和 RTSP，所以内存数字不是同口径对比，只说明替换后余量更大。
 
 ## 目录
