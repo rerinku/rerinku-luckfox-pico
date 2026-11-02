@@ -1,0 +1,26 @@
+rerinku-luckfox-pico
+Copyright 2026 Rerinku
+
+This product includes software developed as part of the Rerinku project
+(https://github.com/rerinku/rerinku-luckfox-pico).
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for
+the full license text.
+
+The program is built together with the Rerinku Device SDK (Apache License 2.0),
+which statically includes the following third-party software:
+
+  libjuice   https://github.com/paullouisageneau/libjuice
+             Mozilla Public License 2.0
+  libsrtp    https://github.com/cisco/libsrtp
+             BSD 3-Clause License
+  Mbed TLS   https://github.com/Mbed-TLS/mbedtls
+             Apache License 2.0
+  coreMQTT   https://github.com/FreeRTOS/coreMQTT
+             MIT License
+  cJSON      https://github.com/DaveGamble/cJSON
+             MIT License
+
+At run time the program loads the Rockchip media libraries (rockit, rkaiq,
+mpp, rga) that ship in the Luckfox Pico firmware. They are closed-source,
+are not part of this repository and are not redistributed with it.
