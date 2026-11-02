@@ -10,8 +10,8 @@
 //   - Media is not relayed: WebRTC is UDP, and the device and the server
 //     meet directly through STUN.
 //
-//	view-relay -listen 192.168.1.139 -http 28070 -mqtt 21883 \
-//	    -upstream 100.96.30.88:8070 -upstream-mqtt 100.96.30.88:1883
+//	view-relay -listen 192.168.1.10 -http 28070 -mqtt 21883 \
+//	    -upstream 100.64.0.10:8080 -upstream-mqtt 100.64.0.10:1883
 package main
 
 import (

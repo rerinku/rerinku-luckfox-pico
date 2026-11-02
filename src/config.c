@@ -160,7 +160,7 @@ int config_load(app_config *c, const char *path) {
 
 int config_finish(app_config *c) {
     if (!c->endpoint[0]) {
-        LOGE("endpoint is not set (the rerinku platform URL, e.g. http://192.168.1.10:18070)");
+        LOGE("endpoint is not set (the Rerinku View URL, e.g. http://192.168.1.10:8080)");
         return -1;
     }
     if (strcmp(c->codec, "h264") != 0 && strcmp(c->codec, "h265") != 0) {

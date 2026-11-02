@@ -5,7 +5,7 @@
 
 typedef struct app_config {
     /* platform */
-    char endpoint[256]; /* onboard base URL, e.g. http://192.168.1.10:18070 */
+    char endpoint[256]; /* Rerinku View base URL, e.g. http://192.168.1.10:8080 */
     char sn[64];        /* empty: LUCKFOX-<CPU serial> */
     char name[64];      /* empty: the platform shows the SN */
     char secret[128];   /* base64(HMAC-SHA256(device key, sn)) when keys are enforced */

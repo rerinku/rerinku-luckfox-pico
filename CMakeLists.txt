@@ -1,6 +1,6 @@
 # rerinku-luckfox — the camera program for Luckfox Pico (RV1103 / RV1106).
 #
-# Links the rerinku device SDK (built by scripts/build-sdk.sh) and the
+# Links the Rerinku Device SDK (built by scripts/build-sdk.sh) and the
 # Rockchip media libraries from the Luckfox SDK (rockit for VI/VENC, rkaiq for
 # the ISP). The media libraries are closed-source shared objects: headers and
 # link stubs come from the SDK, at run time the board's own copies in

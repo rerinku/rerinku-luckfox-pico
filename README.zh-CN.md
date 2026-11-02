@@ -6,19 +6,19 @@
 
 [快速开始](#快速开始) · [配置](#配置) · [从源码编译](#从源码编译) · [常见问题](#常见问题) · [Issues](https://github.com/rerinku/rerinku-luckfox-pico/issues)
 
-简体中文
+[English](README.md) · 简体中文 · [日本語](README.ja.md)
 
 </div>
 
-`rerinku-luckfox` 替代 Luckfox Pico 出厂的 `rkipc`:初始化摄像头传感器、ISP 和硬件编码器,通过 Rerinku 设备 SDK 把 H.265 / H.264 画面推送到 [Rerinku View](https://hub.docker.com/r/rerinku/view)。在 Rerinku View 的网页里打开设备就能看到实时画面,支持录像、回放和 AI 识别。
+`rerinku-luckfox` 替代 Luckfox Pico 出厂的 `rkipc`:初始化摄像头传感器、ISP 和硬件编码器,通过 [Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk) 把 H.265 / H.264 画面推送到自托管 NVR [Rerinku View](https://github.com/rerinku/rerinku-view)。在 Rerinku View 的网页里打开设备就能看到实时画面,支持录像、回放和 AI 识别。
 
-它也是硬件厂商集成 Rerinku 设备 SDK 的完整参考实现:从采集、编码到推流、命令响应,全部是可读的 C 代码。
+它也是硬件厂商集成这个 SDK 的完整参考实现:从采集、编码到推流、命令响应,全部是可读的 C 代码。
 
 ## 特性
 
 - **低延迟实时画面:** 编码后的码流直接交给 SDK,通过 WebRTC 推送,打开画面通常在 1 到 2 秒内出首帧。
 - **双码流:** 主码流默认 H.265、2304×1296@25、2 Mbit/s;子码流默认 H.264、640×360、512 kbit/s,供多分屏、手机和不支持 H.265 的浏览器使用。没人观看某一路时,SDK 不发送它。
-- **硬件编码和快照:** 视频编码和 JPEG 快照都由 SoC 的硬件编码器完成,编码不占用 CPU。
+- **硬件编码和快照:** 视频和 JPEG 快照都由 SoC 的硬件编码器处理。
 - **占用小:** 程序约 400 KB(含 SDK),比出厂的 rkipc 多留出约 4 MB 系统内存,详见[实测数据](#实测数据)。
 - **自动上线:** 设备序列号默认取 CPU 序列号,第一次连上 Rerinku View 就出现在设备列表里,不用手动添加。
 - **设备信息和运行状态:** 在 Rerinku View 里能看到 SoC、CPU、内存、系统版本,以及实时的温度、CPU 和内存占用。
@@ -47,7 +47,7 @@
                         └────────────────────────────────────────────┘  │ 编码后的帧
                                                                         ↓
                                          ┌──────────────────────────────────┐
-                                         │ Rerinku 设备 SDK                  │
+                                         │ Rerinku Device SDK               │
                                          │ HTTP 注册 · MQTT 控制 · WebRTC 推流 │
                                          └────────────────┬─────────────────┘
                                                           ↓
@@ -79,12 +79,14 @@ docker run -d --name rerinku-view \
 
 **2. 编译并安装到板子**
 
+先准备好编译环境,步骤见[从源码编译](#从源码编译)。然后运行:
+
 ```sh
 scripts/build-app.sh                                       # 编译,产物在 out/
 scripts/deploy.sh --endpoint http://<Rerinku View 地址>:8080 --reboot
 ```
 
-`deploy.sh` 默认用 `root@192.168.1.100` 通过 SSH 连板子,用环境变量 `LUCKFOX_HOST` 可以改。首次编译需要先准备环境,见[从源码编译](#从源码编译)。
+`deploy.sh` 默认用 `root@192.168.1.100` 通过 SSH 连板子,用环境变量 `LUCKFOX_HOST` 可以改。
 
 **3. 看画面**
 
@@ -145,7 +147,7 @@ rkipc 占着摄像头,而且停掉后无法干净地重新拉起,所以第一次
 
 交叉编译在 Luckfox 官方的 Docker 镜像里进行,和宿主机系统无关(官方只支持 Ubuntu 22.04 x86_64)。
 
-**目录布局:** 本仓库和 [Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk)(Apache-2.0)需要并排放在同一个目录下:
+本仓库和 [Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk)(Apache-2.0)需要并排放在同一个目录下:
 
 ```
 workspace/
@@ -205,8 +207,8 @@ rkipc 同时运行主码流、子码流、智能分析和 RTSP,所以这些内�
 **能上线,但画面打不开?**
 画面走 WebRTC(UDP),板子和浏览器、Rerinku View 之间的网络要能互通。同一个局域网内一般没有问题;跨网络访问要看 Rerinku View 一侧的网络设置。
 
-**网页里播不了画面,但 H.264 的设备可以?**
-默认主码流是 H.265,只有部分浏览器能解码。不用担心:平台会给不支持的浏览器播放子码流。如果你关掉了子码流(`sub = 0`),请把 `codec` 改成 `h264`。
+**有的浏览器播不了主码流,但 H.264 的设备可以?**
+默认主码流是 H.265,只有部分浏览器能解码。平台会给不支持的浏览器播放子码流。如果你关掉了子码流(`sub = 0`),请把 `codec` 改成 `h264`。
 
 **使用 https 的服务器地址时连不上?**
 TLS 证书校验依赖板子的系统时钟。先确认板子的时间正确(NTP 是否生效)。
@@ -214,8 +216,8 @@ TLS 证书校验依赖板子的系统时钟。先确认板子的时间正确(NTP
 **日志里有 `XCORE:E:invalid main scene len!`?**
 这是 rkaiq 每次初始化都会打印的信息,不影响使用。
 
-**板子的内核没有 IPv6,日志里有 `errno=97`?**
-SDK 的 ICE 组件会先尝试创建 IPv6 套接字,失败后自动退回 IPv4,无害。
+**日志里有 `errno=97`?**
+板子的内核没有 IPv6。SDK 的 ICE 组件会先尝试创建 IPv6 套接字,失败后自动退回 IPv4,不影响使用。
 
 ## 项目结构
 
@@ -245,6 +247,4 @@ sdk/             Luckfox 官方 SDK 的版本锁定文件;SDK 本体由 fetch-sd
 
 ## 许可证
 
-[Apache License 2.0](LICENSE)。
-
-本项目链接并分发的第三方组件各自遵循自己的许可证:瑞芯微的媒体库(rockit、rkaiq、rga、mpp)是闭源二进制,Luckfox 官方 SDK 遵循其仓库中的许可;设备 SDK 及其依赖见 [rerinku-device-sdk](https://github.com/rerinku/rerinku-device-sdk) 的 `NOTICE`。
+[Apache License 2.0](LICENSE)。第三方组件见 [NOTICE](NOTICE),各自遵循自己的许可证。瑞芯微的媒体库是板子固件自带的闭源二进制,不在本仓库内。

@@ -2,7 +2,7 @@
 # Install the camera program (out/, from scripts/build-app.sh) on a Luckfox
 # Pico over SSH and make it start at boot instead of rkipc.
 #
-#   scripts/deploy.sh --endpoint http://192.168.1.10:18070      install + autostart
+#   scripts/deploy.sh --endpoint http://192.168.1.10:8080       install + autostart
 #   scripts/deploy.sh --reboot                                  ... and reboot now
 #   scripts/deploy.sh --no-autostart                            only copy files
 #   scripts/deploy.sh --restore-rkipc                           undo the boot change

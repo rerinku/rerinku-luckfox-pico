@@ -1,8 +1,8 @@
 /* rerinku-luckfox — camera program for Luckfox Pico (RV1103 / RV1106).
  *
  * Replaces Rockchip's reference application rkipc: brings up the sensor, ISP
- * and hardware encoder and connects the camera to a rerinku platform through
- * the rerinku device SDK. The encoder runs all the time (its frames are
+ * and hardware encoder and connects the camera to Rerinku View through
+ * the Rerinku Device SDK. The encoder runs all the time (its frames are
  * dropped cheaply while nobody watches), so a viewer gets a picture as soon
  * as the next IDR, which the SDK requests when a session opens.
  *
@@ -214,7 +214,7 @@ static void usage(const char *argv0) {
             "usage: %s [-c config] [--syslog] [key=value ...]\n"
             "  -c FILE     settings file (default " DEFAULT_CONFIG ")\n"
             "  --syslog    log to syslog instead of stderr\n"
-            "  key=value   override a setting, e.g. endpoint=http://192.168.1.10:18070\n"
+            "  key=value   override a setting, e.g. endpoint=http://192.168.1.10:8080\n"
             "  -V          print the version\n",
             argv0);
 }
@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
         } else if (strcmp(argv[i], "--syslog") == 0) {
             use_syslog = 1;
         } else if (strcmp(argv[i], "-V") == 0) {
-            printf("rerinku-luckfox %s (rerinku SDK %s)\n", APP_VERSION, rerinku_version());
+            printf("rerinku-luckfox %s (Rerinku Device SDK %s)\n", APP_VERSION, rerinku_version());
             return 0;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             usage(argv[0]);
