@@ -10,6 +10,10 @@ English · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
 </div>
 
+![A Luckfox Pico Plus with its camera module, next to the live stream from a board running rerinku-luckfox, with status readings for CPU, temperature, memory and uplink](assets/luckfox-pico-plus.webp)
+
+A Luckfox Pico Plus with its camera module (left), and the live stream from a board running `rerinku-luckfox`, with its status readings (right).
+
 `rerinku-luckfox` replaces `rkipc`, the program the Luckfox Pico ships with. It sets up the camera sensor, the ISP and the hardware encoder, then uses the [Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk) to push H.265 or H.264 video to [Rerinku View](https://github.com/rerinku/rerinku-view), a self-hosted NVR. Open the device in Rerinku View to watch it live, record it, play it back and run AI detection on it.
 
 It is also a complete reference for hardware vendors integrating the SDK: capture, encoding, streaming and command handling are all readable C code.

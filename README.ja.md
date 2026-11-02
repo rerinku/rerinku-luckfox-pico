@@ -10,6 +10,10 @@
 
 </div>
 
+![Luckfox Pico Plus ボードとカメラモジュール、その隣に rerinku-luckfox を実行中のボードのライブ映像と、CPU、温度、メモリ、アップリンクの状態表示](assets/luckfox-pico-plus.webp)
+
+左は Luckfox Pico Plus ボードとカメラモジュール、右は `rerinku-luckfox` を実行中のボードのライブ映像と状態表示です。
+
 `rerinku-luckfox` は、Luckfox Pico に標準で入っている `rkipc` を置き換えるプログラムです。カメラセンサー、ISP、ハードウェアエンコーダーを初期化し、[Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk) を使って H.265 / H.264 の映像をセルフホスト型 NVR の [Rerinku View](https://github.com/rerinku/rerinku-view) に送信します。Rerinku View でデバイスを開くと、ライブ表示、録画、再生、AI 認識を利用できます。
 
 ハードウェアメーカーが SDK を組み込む際の完全なリファレンス実装でもあります。キャプチャ、エンコード、配信、コマンド処理のすべてを読みやすい C コードで確認できます。

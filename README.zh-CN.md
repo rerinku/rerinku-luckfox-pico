@@ -10,6 +10,10 @@
 
 </div>
 
+![Luckfox Pico Plus 开发板和摄像头模组,旁边是运行 rerinku-luckfox 的开发板的实时画面,以及 CPU、温度、内存和上行速率读数](assets/luckfox-pico-plus.webp)
+
+左边是 Luckfox Pico Plus 开发板和摄像头模组,右边是运行 `rerinku-luckfox` 的开发板的实时画面和运行读数。
+
 `rerinku-luckfox` 替代 Luckfox Pico 出厂的 `rkipc`:初始化摄像头传感器、ISP 和硬件编码器,通过 [Rerinku Device SDK](https://github.com/rerinku/rerinku-device-sdk) 把 H.265 / H.264 画面推送到自托管 NVR [Rerinku View](https://github.com/rerinku/rerinku-view)。在 Rerinku View 的网页里打开设备就能看到实时画面,支持录像、回放和 AI 识别。
 
 它也是硬件厂商集成这个 SDK 的完整参考实现:从采集、编码到推流、命令响应,全部是可读的 C 代码。
