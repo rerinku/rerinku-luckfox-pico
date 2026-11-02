@@ -1,4 +1,4 @@
-// 交叉工具链冒烟测试：覆盖 rerinku-client 依赖的 C++17 特性（线程、原子、optional/variant、
+// 交叉工具链冒烟测试：覆盖 rerinku-device-sdk 依赖的 C++17 特性（线程、原子、optional/variant、
 // chrono、异常），编出来放到板子上跑，全部通过打印 "smoke ok"。
 #include <atomic>
 #include <chrono>

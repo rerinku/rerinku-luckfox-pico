@@ -24,13 +24,13 @@ scripts/docker-shell.sh       # 进入编译容器（工具链已在 PATH）
 - SDK 目录不进版本控制。瑞芯微的媒体库（rockit、rkaiq、rga、mpp）是闭源二进制，
   只在编译时从 SDK 取头文件和库，运行时链接板子固件 `/oem/usr/lib` 里自带的那份。
 - `docker-shell.sh` 默认以宿主机用户运行，整个 workspace 按原路径挂载，
-  容器里可以直接访问旁边的 `rerinku-client`。整包固件编译（SDK 的 `./build.sh`）
+  容器里可以直接访问旁边的 `rerinku-device-sdk`。整包固件编译（SDK 的 `./build.sh`）
   需要 root：`DOCKER_ROOT=1 scripts/docker-shell.sh`。
 
 ## 编译
 
 ```sh
-scripts/build-sdk.sh    # rerinku SDK（../rerinku-client，纯 C）→ build/rerinku-sdk/
+scripts/build-sdk.sh    # Rerinku Device SDK（../rerinku-device-sdk，纯 C）→ build/rerinku-sdk/
 scripts/build-app.sh    # 主程序 → out/（缺 SDK 时先自动编 SDK）
 ```
 

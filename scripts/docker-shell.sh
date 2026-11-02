@@ -5,7 +5,7 @@
 #   scripts/docker-shell.sh <命令...>       在容器里执行一条命令后退出
 #   DOCKER_ROOT=1 scripts/docker-shell.sh   以 root 运行（整包固件编译 ./build.sh 需要）
 #
-# 整个 workspace 按宿主机同一路径挂载，容器里能直接访问旁边的 rerinku-client，
+# 整个 workspace 按宿主机同一路径挂载，容器里能直接访问旁边的 rerinku-device-sdk，
 # 报错里的路径也和宿主机一致。默认用宿主机 uid/gid 运行，避免留下 root 拥有的文件。
 # 交叉工具链来自 SDK 源码（scripts/fetch-sdk.sh 拉取），已加进 PATH。
 set -euo pipefail
